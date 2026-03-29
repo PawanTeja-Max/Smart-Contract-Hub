@@ -48,6 +48,25 @@ pub struct SmartContractHub;
 #[contractimpl]
 impl SmartContractHub {
 
+    // ─── HELPER ─────────────────────────────────────────────────────────────────
+    // Validates contract ID format and length, panics on invalid values.
+    fn validate_contract_id(id: &String) {
+        let id_len = id.len();
+        if id_len == 0 || id_len > 64 {
+            panic!("Contract ID must be 1 to 64 characters long");
+        }
+
+        for byte in id.to_bytes() {
+            let is_alnum =
+                (byte >= b'0' && byte <= b'9') ||
+                (byte >= b'A' && byte <= b'Z') ||
+                (byte >= b'a' && byte <= b'z');
+            if !is_alnum {
+                panic!("Contract ID must be alphanumeric");
+            }
+        }
+    }
+
     // ─── FUNCTION 1 ───────────────────────────────────────────────────────────
     // Registers a new smart contract entry in the hub.
     // Returns the unique ID assigned to the newly registered entry.
@@ -59,17 +78,7 @@ impl SmartContractHub {
         category: String,
         owner: String,
     ) -> String {
-        // validate id: 1-64 alphanumeric
-        let id_len = id.len();
-        if id_len == 0 || id_len > 64 {
-            panic!("Contract ID must be 1 to 64 characters long");
-        }
-        for byte in id.to_bytes() {
-            let is_alnum = (byte >= b'0' && byte <= b'9') || (byte >= b'A' && byte <= b'Z') || (byte >= b'a' && byte <= b'z');
-            if !is_alnum {
-                panic!("Contract ID must be alphanumeric");
-            }
-        }
+        Self::validate_contract_id(&id);
 
         // Ensure unique ID
         if env.storage().instance().has(&ContractBook::Entry(id.clone())) {
@@ -95,13 +104,13 @@ impl SmartContractHub {
             .instance()
             .set(&ContractBook::Entry(id.clone()), &entry);
 
-        // Add to all IDs list
-        let mut all_ids: Vec<String> = env.storage().instance().get(&ALL_IDS).unwrap_or(Vec::new(&env));
+        // Add to all IDs list safely (avoid MissingValue host error)
+        let mut all_ids: Vec<String> = Self::safe_all_ids(&env);
         all_ids.push_back(id.clone());
         env.storage().instance().set(&ALL_IDS, &all_ids);
 
         // Update hub-wide stats
-        let mut stats = Self::view_hub_stats(env.clone());
+        let mut stats = Self::safe_hub_stats(&env);
         stats.total += 1;
         stats.active += 1;
         env.storage().instance().set(&HUB_STATS, &stats);
@@ -117,10 +126,10 @@ impl SmartContractHub {
     // Returns the ContractEntry for a given ID.
     // If no entry exists for that ID, default/empty values are returned.
     pub fn view_contract(env: Env, id: String) -> ContractEntry {
-        env.storage()
-            .instance()
-            .get(&ContractBook::Entry(id.clone()))
-            .unwrap_or(ContractEntry {
+        if env.storage().instance().has(&ContractBook::Entry(id.clone())) {
+            env.storage().instance().get(&ContractBook::Entry(id.clone())).unwrap()
+        } else {
+            ContractEntry {
                 id,
                 title: String::from_str(&env, "Not_Found"),
                 descrip: String::from_str(&env, "Not_Found"),
@@ -129,7 +138,8 @@ impl SmartContractHub {
                 reg_time: 0,
                 is_active: false,
                 external_address: None,
-            })
+            }
+        }
     }
 
 
@@ -168,27 +178,41 @@ impl SmartContractHub {
     }
 
 
-    // ─── FUNCTION 4 ───────────────────────────────────────────────────────────
-    // Returns the global HubStats (total, active, inactive counts).
-    pub fn view_hub_stats(env: Env) -> HubStats {
-        env.storage()
-            .instance()
-            .get(&HUB_STATS)
-            .unwrap_or(HubStats {
+    // ─── HELPER ─────────────────────────────────────────────────────────────────
+    // Safely returns hub stats, initializing to defaults when missing.
+    fn safe_hub_stats(env: &Env) -> HubStats {
+        if env.storage().instance().has(&HUB_STATS) {
+            env.storage().instance().get(&HUB_STATS).unwrap()
+        } else {
+            HubStats {
                 total: 0,
                 active: 0,
                 inactive: 0,
-            })
+            }
+        }
+    }
+
+    // ─── HELPER ─────────────────────────────────────────────────────────────────
+    // Safely returns all IDs list, initializing to empty when missing.
+    fn safe_all_ids(env: &Env) -> Vec<String> {
+        if env.storage().instance().has(&ALL_IDS) {
+            env.storage().instance().get(&ALL_IDS).unwrap()
+        } else {
+            Vec::new(env)
+        }
+    }
+
+    // ─── FUNCTION 4 ───────────────────────────────────────────────────────────
+    // Returns the global HubStats (total, active, inactive counts).
+    pub fn view_hub_stats(env: Env) -> HubStats {
+        Self::safe_hub_stats(&env)
     }
 
 
     // ─── FUNCTION 5 ───────────────────────────────────────────────────────────
     // Returns a list of all registered contract IDs for browsing.
     pub fn list_contract_ids(env: Env) -> Vec<String> {
-        env.storage()
-            .instance()
-            .get(&ALL_IDS)
-            .unwrap_or(Vec::new(&env))
+        Self::safe_all_ids(&env)
     }
 
 
@@ -203,17 +227,7 @@ impl SmartContractHub {
         owner: String,
         external_address: String,
     ) -> String {
-        // validate id: 1-64 alphanumeric
-        let id_len = id.len();
-        if id_len == 0 || id_len > 64 {
-            panic!("Contract ID must be 1 to 64 characters long");
-        }
-        for byte in id.to_bytes() {
-            let is_alnum = (byte >= b'0' && byte <= b'9') || (byte >= b'A' && byte <= b'Z') || (byte >= b'a' && byte <= b'z');
-            if !is_alnum {
-                panic!("Contract ID must be alphanumeric");
-            }
-        }
+        Self::validate_contract_id(&id);
 
         // Ensure unique ID
         if env.storage().instance().has(&ContractBook::Entry(id.clone())) {
@@ -239,13 +253,13 @@ impl SmartContractHub {
             .instance()
             .set(&ContractBook::Entry(id.clone()), &entry);
 
-        // Add to all IDs list
-        let mut all_ids: Vec<String> = env.storage().instance().get(&ALL_IDS).unwrap_or(Vec::new(&env));
+        // Add to all IDs list safely (avoid MissingValue host error)
+        let mut all_ids: Vec<String> = Self::safe_all_ids(&env);
         all_ids.push_back(id.clone());
         env.storage().instance().set(&ALL_IDS, &all_ids);
 
         // Update hub-wide stats
-        let mut stats = Self::view_hub_stats(env.clone());
+        let mut stats = Self::safe_hub_stats(&env);
         stats.total += 1;
         stats.active += 1;
         env.storage().instance().set(&HUB_STATS, &stats);

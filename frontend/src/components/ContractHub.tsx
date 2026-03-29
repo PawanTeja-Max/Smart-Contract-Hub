@@ -44,10 +44,18 @@ export function ContractHub() {
     return result;
   };
 
-  const registerContract = async () => {
+  const validateContractId = (id: string) => {
     const idPattern = /^[a-zA-Z0-9]{1,64}$/;
-    if (!idPattern.test(contractId)) {
-      alert('Contract ID must be alphanumeric and 1 to 64 characters long.');
+    if (!idPattern.test(id)) {
+      throw new Error('Contract ID must be alphanumeric and 1 to 64 characters long.');
+    }
+  };
+
+  const registerContract = async () => {
+    try {
+      validateContractId(contractId);
+    } catch (error: any) {
+      alert(error.message);
       return;
     }
 
@@ -142,9 +150,10 @@ export function ContractHub() {
   };
 
   const registerExternalContract = async () => {
-    const idPattern = /^[a-zA-Z0-9]{1,64}$/;
-    if (!idPattern.test(contractId)) {
-      alert('Contract ID must be alphanumeric and 1 to 64 characters long.');
+    try {
+      validateContractId(contractId);
+    } catch (error: any) {
+      alert(error.message);
       return;
     }
 

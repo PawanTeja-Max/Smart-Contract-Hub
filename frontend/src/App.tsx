@@ -1,24 +1,10 @@
 import { SorobanReactProvider } from '@soroban-react/core';
 import { freighter } from '@soroban-react/freighter';
+import { testnet, mainnet } from '@soroban-react/chains';
 import { ContractHub } from './components/ContractHub';
 import { WalletConnector } from './components/WalletConnector';
 
-const chains = [
-  {
-    id: 'testnet',
-    name: 'Testnet',
-    network: 'Test SDF Network ; September 2015',
-    networkPassphrase: 'Test SDF Network ; September 2015',
-    networkUrl: 'https://soroban-testnet.stellar.org',
-  },
-  {
-    id: 'mainnet',
-    name: 'Mainnet',
-    network: 'Public Global Stellar Network ; September 2015',
-    networkPassphrase: 'Public Global Stellar Network ; September 2015',
-    networkUrl: 'https://soroban-rpc.mainnet.stellar.gateway.fm',
-  },
-];
+const chains = [testnet, mainnet];
 
 const connectors = [freighter()];
 
