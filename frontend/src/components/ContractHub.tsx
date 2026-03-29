@@ -26,7 +26,7 @@ export function ContractHub() {
     const account = await server.getAccount(address);
     const tx = new TransactionBuilder(account, {
       fee: '100',
-      networkPassphrase: activeChain?.network,
+      networkPassphrase: activeChain?.networkPassphrase || activeChain?.network?.networkPassphrase || 'Standalone Network ; February 2017',
     })
       .addOperation(contract.call(method, ...args.map(arg => nativeToScVal(arg))))
       .setTimeout(30)
