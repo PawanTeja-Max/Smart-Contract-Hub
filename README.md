@@ -89,3 +89,17 @@ pub struct HubStats {
 ---
 
 > Built with ❤️ on Stellar · Powered by Soroban
+
+---
+
+## Deployed Contract
+
+Contract ID:
+
+`CA2R3BJOQP2EGR5NGIZVQQNF6EQYONUGAMR2LVVDQSAKG7WKPMUEEBPG`
+
+## Contract on-chain status
+
+![Smart Contract Hub on Stellar Explorer](https://user-images.githubusercontent.com/0/placeholder.png)
+
+*Screenshot of deployed contract summary with contract address and status.*
