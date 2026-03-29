@@ -8,14 +8,16 @@ export function ContractHub() {
   const { address, activeChain, server, activeConnector } = useSorobanReact();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [viewId, setViewId] = useState('');
-  const [viewedContract, setViewedContract] = useState<any>(null);
 
   // Form states
+  const [contractId, setContractId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [owner, setOwner] = useState('');
+  const [externalAddress, setExternalAddress] = useState('');
+  const [allContracts, setAllContracts] = useState<any[]>([]);
+  const [searchCategory, setSearchCategory] = useState('');
 
   const contract = new Contract(CONTRACT_ID);
 
@@ -43,11 +45,18 @@ export function ContractHub() {
   };
 
   const registerContract = async () => {
+    const idPattern = /^[a-zA-Z0-9]{1,64}$/;
+    if (!idPattern.test(contractId)) {
+      alert('Contract ID must be alphanumeric and 1 to 64 characters long.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const args = [title, description, category, owner || address];
+      const args = [contractId, title, description, category, owner || address];
       await callContract('register_contract', args);
       alert('Contract registered successfully!');
+      setContractId('');
       setTitle('');
       setDescription('');
       setCategory('');
@@ -60,7 +69,7 @@ export function ContractHub() {
     setLoading(false);
   };
 
-  const viewContract = async (id: number) => {
+  const viewContract = async (id: string) => {
     if (!server || !address) return null;
     const account = await server.getAccount(address);
     const tx = new TransactionBuilder(account, {
@@ -105,12 +114,67 @@ export function ContractHub() {
     setStats(stats);
   };
 
-  const handleViewContract = async () => {
-    if (!viewId) return;
-    const id = parseInt(viewId);
-    if (isNaN(id)) return;
-    const contract = await viewContract(id);
-    setViewedContract(contract);
+  const listAllContracts = async () => {
+    if (!server || !address) return;
+    const account = await server.getAccount(address);
+    const tx = new TransactionBuilder(account, {
+      fee: '100',
+      networkPassphrase: activeChain?.network,
+    })
+      .addOperation(contract.call('list_contract_ids'))
+      .setTimeout(30)
+      .build();
+
+    // @ts-ignore
+    const result = await server.simulateTransaction(tx);
+    if ('result' in result && result.result) {
+      // @ts-ignore
+      const ids = scValToNative(result.result.retval);
+      const contracts = [];
+      for (const id of ids) {
+        const contractData = await viewContract(id);
+        if (contractData && contractData.reg_time !== 0) {
+          contracts.push(contractData);
+        }
+      }
+      setAllContracts(contracts);
+    }
+  };
+
+  const registerExternalContract = async () => {
+    const idPattern = /^[a-zA-Z0-9]{1,64}$/;
+    if (!idPattern.test(contractId)) {
+      alert('Contract ID must be alphanumeric and 1 to 64 characters long.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const args = [contractId, title, description, category, owner || address, externalAddress];
+      await callContract('register_external_contract', args);
+      alert('External contract registered successfully!');
+      setContractId('');
+      setTitle('');
+      setDescription('');
+      setCategory('');
+      setOwner('');
+      setExternalAddress('');
+      loadStats();
+      listAllContracts();
+    } catch (error) {
+      console.error(error);
+      alert('Error registering external contract');
+    }
+    setLoading(false);
+  };
+
+  const searchContracts = async () => {
+    if (!searchCategory) {
+      listAllContracts();
+      return;
+    }
+    const filtered = allContracts.filter(c => c.category.toLowerCase().includes(searchCategory.toLowerCase()));
+    setAllContracts(filtered);
   };
 
   React.useEffect(() => {
@@ -150,6 +214,18 @@ export function ContractHub() {
       <section>
         <h2>Register New Contract</h2>
         <form onSubmit={(e) => { e.preventDefault(); registerContract(); }}>
+          <div className="form-group">
+            <label htmlFor="contractId">Contract ID</label>
+            <input
+              id="contractId"
+              type="text"
+              placeholder="Alphanumeric ID (1-64 chars)"
+              value={contractId}
+              onChange={(e) => setContractId(e.target.value)}
+              required
+              maxLength={64}
+            />
+          </div>
           <div className="form-group">
             <label htmlFor="title">Title</label>
             <input
@@ -200,31 +276,107 @@ export function ContractHub() {
       </section>
 
       <section>
-        <h2>View Contract</h2>
-        <div className="form-group">
-          <label htmlFor="viewId">Contract ID</label>
-          <input
-            id="viewId"
-            type="number"
-            placeholder="Enter contract ID"
-            value={viewId}
-            onChange={(e) => setViewId(e.target.value)}
-          />
-          <button onClick={handleViewContract} disabled={!viewId}>View Contract</button>
-        </div>
-        {viewedContract && viewedContract.id !== 0 && (
-          <div className="contract-item">
-            <h4>{viewedContract.title}</h4>
-            <p><strong>Description:</strong> {viewedContract.descrip}</p>
-            <p><strong>Category:</strong> {viewedContract.category}</p>
-            <p><strong>Owner:</strong> {viewedContract.owner}</p>
-            <p><strong>Registration Time:</strong> {new Date(viewedContract.reg_time * 1000).toLocaleString()}</p>
-            <p><strong>Status:</strong> {viewedContract.is_active ? 'Active' : 'Inactive'}</p>
+        <h2>Register External Contract (Global Discovery)</h2>
+        <form onSubmit={(e) => { e.preventDefault(); registerExternalContract(); }}>
+          <div className="form-group">
+            <label htmlFor="extContractId">Contract ID</label>
+            <input
+              id="extContractId"
+              type="text"
+              placeholder="Alphanumeric ID (1-64 chars)"
+              value={contractId}
+              onChange={(e) => setContractId(e.target.value)}
+              required
+              maxLength={64}
+            />
           </div>
-        )}
-        {viewedContract && viewedContract.id === 0 && (
-          <p>Contract not found.</p>
-        )}
+          <div className="form-group">
+            <label htmlFor="extTitle">Title</label>
+            <input
+              id="extTitle"
+              type="text"
+              placeholder="Contract Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="extDescription">Description</label>
+            <input
+              id="extDescription"
+              type="text"
+              placeholder="Brief description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="extCategory">Category</label>
+            <input
+              id="extCategory"
+              type="text"
+              placeholder="e.g. DeFi, NFT, DAO"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="extOwner">Owner (optional)</label>
+            <input
+              id="extOwner"
+              type="text"
+              placeholder="Stellar address"
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="externalAddress">External Contract Address</label>
+            <input
+              id="externalAddress"
+              type="text"
+              placeholder="External contract address"
+              value={externalAddress}
+              onChange={(e) => setExternalAddress(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" disabled={loading}>
+            {loading ? 'Registering...' : 'Register External Contract'}
+          </button>
+        </form>
+      </section>
+
+      <section>
+        <h2>Browse All Contracts</h2>
+        <div className="form-group">
+          <label htmlFor="searchCategory">Search by Category</label>
+          <input
+            id="searchCategory"
+            type="text"
+            placeholder="Filter by category"
+            value={searchCategory}
+            onChange={(e) => setSearchCategory(e.target.value)}
+          />
+          <button onClick={searchContracts}>Search</button>
+          <button onClick={listAllContracts}>Load All</button>
+        </div>
+        <div className="contracts-list">
+          {allContracts.map((contract, index) => (
+            <div key={index} className="contract-item">
+              <h4>{contract.title} (ID: {contract.id})</h4>
+              <p><strong>Description:</strong> {contract.descrip}</p>
+              <p><strong>Category:</strong> {contract.category}</p>
+              <p><strong>Owner:</strong> {contract.owner}</p>
+              {contract.external_address && <p><strong>External Address:</strong> {contract.external_address}</p>}
+              <p><strong>Registration Time:</strong> {new Date(contract.reg_time * 1000).toLocaleString()}</p>
+              <p><strong>Status:</strong> {contract.is_active ? 'Active' : 'Inactive'}</p>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );
