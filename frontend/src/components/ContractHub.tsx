@@ -26,7 +26,7 @@ export function ContractHub() {
     const account = await server.getAccount(address);
     const tx = new TransactionBuilder(account, {
       fee: '100',
-      networkPassphrase: activeChain?.networkPassphrase || activeChain?.network?.networkPassphrase || 'Standalone Network ; February 2017',
+      networkPassphrase: activeChain?.networkPassphrase || 'Standalone Network ; February 2017',
     })
       .addOperation(contract.call(method, ...args.map(arg => nativeToScVal(arg))))
       .setTimeout(30)
@@ -74,7 +74,7 @@ export function ContractHub() {
     const account = await server.getAccount(address);
     const tx = new TransactionBuilder(account, {
       fee: '100',
-      networkPassphrase: activeChain?.network,
+      networkPassphrase: activeChain?.networkPassphrase || 'Standalone Network ; February 2017',
     })
       .addOperation(contract.call('view_contract', nativeToScVal(id)))
       .setTimeout(30)
@@ -94,7 +94,7 @@ export function ContractHub() {
     const account = await server.getAccount(address);
     const tx = new TransactionBuilder(account, {
       fee: '100',
-      networkPassphrase: activeChain?.network,
+      networkPassphrase: activeChain?.networkPassphrase || 'Standalone Network ; February 2017',
     })
       .addOperation(contract.call('view_hub_stats'))
       .setTimeout(30)
@@ -119,7 +119,7 @@ export function ContractHub() {
     const account = await server.getAccount(address);
     const tx = new TransactionBuilder(account, {
       fee: '100',
-      networkPassphrase: activeChain?.network,
+      networkPassphrase: activeChain?.networkPassphrase || 'Standalone Network ; February 2017',
     })
       .addOperation(contract.call('list_contract_ids'))
       .setTimeout(30)
