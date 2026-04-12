@@ -171,12 +171,13 @@ impl SmartContractHub {
         // Require the caller to authenticate as the owner
         owner.require_auth();
 
-        let mut entry = Self::view_contract(env.clone(), id.clone());
-
-        if entry.reg_time == 0 {
+        let key = ContractBook::Entry(id.clone());
+        if !env.storage().instance().has(&key) {
             log!(&env, "Entry not found for ID: {}", id);
             panic!("Entry not found");
         }
+        
+        let mut entry: ContractEntry = env.storage().instance().get(&key).unwrap();
 
         // Verify that the caller matches the stored owner
         let caller_str = owner.to_string();
@@ -325,12 +326,13 @@ impl SmartContractHub {
     // Upvotes a registered contract entry. Increments the vote counter by 1.
     // Panics if the entry does not exist or is inactive.
     pub fn upvote_contract(env: Env, id: String) -> u64 {
-        let mut entry = Self::view_contract(env.clone(), id.clone());
-
-        if entry.reg_time == 0 {
+        let key = ContractBook::Entry(id.clone());
+        if !env.storage().instance().has(&key) {
             log!(&env, "Entry not found for ID: {}", id);
             panic!("Entry not found");
         }
+        
+        let mut entry: ContractEntry = env.storage().instance().get(&key).unwrap();
 
         if !entry.is_active {
             log!(&env, "Cannot upvote inactive entry ID: {}", id);
@@ -356,3 +358,6 @@ impl SmartContractHub {
         entry.votes
     }
 }
+
+#[cfg(test)]
+mod test;
