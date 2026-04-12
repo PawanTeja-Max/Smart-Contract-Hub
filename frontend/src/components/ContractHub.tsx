@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSorobanReact } from '@soroban-react/core';
 import { Contract, TransactionBuilder, nativeToScVal, scValToNative } from '@stellar/stellar-sdk';
 
@@ -73,12 +73,12 @@ export function ContractHub() {
       .setTimeout(30)
       .build();
 
-    const preparedTx = await server.prepareTransaction(tx);
+    const preparedTx = await server.prepareTransaction(tx as any);
     const signedXDR = await activeConnector.signTransaction(preparedTx.toXDR(), {
       networkPassphrase: activeChain?.networkPassphrase || 'Standalone Network ; February 2017',
     });
-    const signedTx = TransactionBuilder.fromXDR(signedXDR, activeChain?.networkPassphrase);
-    const result = await server.sendTransaction(signedTx);
+    const signedTx = TransactionBuilder.fromXDR(signedXDR, activeChain?.networkPassphrase || 'Standalone Network ; February 2017');
+    const result = await server.sendTransaction(signedTx as any);
     return result;
   };
 
@@ -168,9 +168,9 @@ export function ContractHub() {
       .setTimeout(30)
       .build();
 
-    const result = await server.simulateTransaction(tx);
+    const result = await server.simulateTransaction(tx as any);
     if ('result' in result && result.result) {
-      return scValToNative(result.result.retval);
+      return scValToNative(result.result.retval as any);
     }
     return null;
   };
@@ -186,9 +186,9 @@ export function ContractHub() {
       .setTimeout(30)
       .build();
 
-    const result = await server.simulateTransaction(tx);
+    const result = await server.simulateTransaction(tx as any);
     if ('result' in result && result.result) {
-      return scValToNative(result.result.retval);
+      return scValToNative(result.result.retval as any);
     }
     return null;
   };
@@ -209,9 +209,9 @@ export function ContractHub() {
       .setTimeout(30)
       .build();
 
-    const result = await server.simulateTransaction(tx);
+    const result = await server.simulateTransaction(tx as any);
     if ('result' in result && result.result) {
-      const ids = scValToNative(result.result.retval) as string[];
+      const ids = scValToNative(result.result.retval as any) as string[];
       const contracts: any[] = [];
       for (const id of ids) {
         const contractData = await viewContract(id);
