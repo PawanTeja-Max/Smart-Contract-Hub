@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
 #![no_std]
-use soroban_sdk::{contract, contracttype, contractimpl, log, Env, Symbol, String, symbol_short, Vec};
+use soroban_sdk::{contract, contracttype, contractimpl, log, Env, Symbol, String, symbol_short, Vec, Address};
 
 
 // Tracks overall hub statistics
@@ -38,6 +38,10 @@ pub struct ContractEntry {
     pub reg_time: u64,     // Ledger timestamp at registration
     pub is_active: bool,   // Whether the entry is currently active
     pub external_address: Option<String>, // Optional external contract address for global discovery
+    pub votes: u64,                       // Community upvote counter
+    pub github_url: Option<String>,       // Optional GitHub repository URL
+    pub website: Option<String>,          // Optional project website URL
+    pub docs_url: Option<String>,         // Optional documentation URL
 }
 
 
@@ -77,6 +81,9 @@ impl SmartContractHub {
         descrip: String,
         category: String,
         owner: String,
+        github_url: Option<String>,
+        website: Option<String>,
+        docs_url: Option<String>,
     ) -> String {
         Self::validate_contract_id(&id);
 
@@ -97,6 +104,10 @@ impl SmartContractHub {
             reg_time: time,
             is_active: true,
             external_address: None, // Internal contract
+            votes: 0,
+            github_url,
+            website,
+            docs_url,
         };
 
         // Persist the entry
@@ -116,6 +127,12 @@ impl SmartContractHub {
         env.storage().instance().set(&HUB_STATS, &stats);
 
         env.storage().instance().extend_ttl(5000, 5000);
+
+        // Emit registration event
+        env.events().publish(
+            (symbol_short!("register"), id.clone()),
+            id.clone(),
+        );
 
         log!(&env, "Contract registered with ID: {}", id);
         id
@@ -138,6 +155,10 @@ impl SmartContractHub {
                 reg_time: 0,
                 is_active: false,
                 external_address: None,
+                votes: 0,
+                github_url: None,
+                website: None,
+                docs_url: None,
             }
         }
     }
@@ -145,13 +166,23 @@ impl SmartContractHub {
 
     // ─── FUNCTION 3 ───────────────────────────────────────────────────────────
     // Marks an existing active contract entry as inactive (soft-delete / archive).
-    // Only callable when the entry exists and is currently active.
-    pub fn deactivate_contract(env: Env, id: String) {
+    // Requires the owner to authenticate via require_auth().
+    pub fn deactivate_contract(env: Env, id: String, owner: Address) {
+        // Require the caller to authenticate as the owner
+        owner.require_auth();
+
         let mut entry = Self::view_contract(env.clone(), id.clone());
 
         if entry.reg_time == 0 {
             log!(&env, "Entry not found for ID: {}", id);
             panic!("Entry not found");
+        }
+
+        // Verify that the caller matches the stored owner
+        let caller_str = owner.to_string();
+        if caller_str != entry.owner {
+            log!(&env, "Unauthorized: caller does not match entry owner for ID: {}", id);
+            panic!("Unauthorized: caller is not the owner");
         }
 
         if !entry.is_active {
@@ -173,6 +204,12 @@ impl SmartContractHub {
         env.storage().instance().set(&HUB_STATS, &stats);
 
         env.storage().instance().extend_ttl(5000, 5000);
+
+        // Emit deactivation event
+        env.events().publish(
+            (symbol_short!("deactiv8"), id.clone()),
+            id.clone(),
+        );
 
         log!(&env, "Entry ID: {} has been deactivated", id);
     }
@@ -226,6 +263,9 @@ impl SmartContractHub {
         category: String,
         owner: String,
         external_address: String,
+        github_url: Option<String>,
+        website: Option<String>,
+        docs_url: Option<String>,
     ) -> String {
         Self::validate_contract_id(&id);
 
@@ -246,6 +286,10 @@ impl SmartContractHub {
             reg_time: time,
             is_active: true,
             external_address: Some(external_address),
+            votes: 0,
+            github_url,
+            website,
+            docs_url,
         };
 
         // Persist the entry
@@ -266,7 +310,49 @@ impl SmartContractHub {
 
         env.storage().instance().extend_ttl(5000, 5000);
 
+        // Emit external registration event
+        env.events().publish(
+            (symbol_short!("ext_reg"), id.clone()),
+            id.clone(),
+        );
+
         log!(&env, "External contract registered with ID: {}", id);
         id
+    }
+
+
+    // ─── FUNCTION 7 ───────────────────────────────────────────────────────────
+    // Upvotes a registered contract entry. Increments the vote counter by 1.
+    // Panics if the entry does not exist or is inactive.
+    pub fn upvote_contract(env: Env, id: String) -> u64 {
+        let mut entry = Self::view_contract(env.clone(), id.clone());
+
+        if entry.reg_time == 0 {
+            log!(&env, "Entry not found for ID: {}", id);
+            panic!("Entry not found");
+        }
+
+        if !entry.is_active {
+            log!(&env, "Cannot upvote inactive entry ID: {}", id);
+            panic!("Cannot upvote an inactive contract");
+        }
+
+        entry.votes += 1;
+
+        // Persist updated entry
+        env.storage()
+            .instance()
+            .set(&ContractBook::Entry(id.clone()), &entry);
+
+        env.storage().instance().extend_ttl(5000, 5000);
+
+        // Emit upvote event
+        env.events().publish(
+            (symbol_short!("upvote"), id.clone()),
+            entry.votes,
+        );
+
+        log!(&env, "Entry ID: {} upvoted. Total votes: {}", id, entry.votes);
+        entry.votes
     }
 }
