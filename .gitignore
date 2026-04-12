@@ -40,3 +40,4 @@ Cargo.lock
 
 # Stellar
 .soroban/
+test_snapshots/
